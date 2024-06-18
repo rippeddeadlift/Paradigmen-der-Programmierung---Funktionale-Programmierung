@@ -8,6 +8,9 @@ class Person(val name: String, var age: Int, val height: Double) {
     }
 }
 
+typealias Ordering<A> = (A, A) -> OrderResult
+
+
 class Sorting {
     fun <T> sort(list: List<T>, ordering: Ordering<T>): List<T> {
         return list.sortedWith { a, b ->
@@ -19,7 +22,6 @@ class Sorting {
         }
     }
 }
-typealias Ordering<A> = (A, A) -> OrderResult
 
 fun main() {
     val intOrd: Ordering<Int> = { left, right ->
@@ -54,8 +56,8 @@ fun main() {
         }
     }
 
-    fun <A> reversed(ordering: Ordering<A>): Ordering<A> = { left, right ->
-        when (ordering(left, right)) {
+    fun <A> Ordering<A>.reversed(): Ordering<A> = { a1, a2 ->
+        when (this(a1, a2)) {
             OrderResult.Lower -> OrderResult.Higher
             OrderResult.Higher -> OrderResult.Lower
             OrderResult.Equal -> OrderResult.Equal
@@ -73,13 +75,18 @@ fun main() {
         OrderResult.Equal
     }
 
-    fun <A, B> contraMap(ordering: Ordering<A>, transform: (B) -> A): Ordering<B> {
-        return { b1: B, b2: B ->
-            ordering(transform(b1), transform(b2))
-        }
+    fun <A, B> Ordering<A>.contraMap(transform: (B) -> A): Ordering<B> = { b1, b2 ->
+        this(transform(b1), transform(b2))
     }
 
-    fun <A, B> zip(orderA: Ordering<A>, orderB: Ordering<B>): Ordering<Pair<A, B>> {
+    fun <A, B> Ordering<A>.zip(other: Ordering<B>): Ordering<Pair<A, B>> = { p1, p2 ->
+        val result1 = this(p1.first, p2.first)
+        if (result1 == OrderResult.Equal) {
+            other(p1.second, p2.second)
+        } else {
+            result1
+        }
+    }/*fun <A, B> zip(orderA: Ordering<A>, orderB: Ordering<B>): Ordering<Pair<A, B>> {
         return { pair1: Pair<A, B>, pair2: Pair<A, B> ->
             val primaryResult = orderA(pair1.first, pair2.first)
             if (primaryResult != OrderResult.Equal) {
@@ -94,28 +101,23 @@ fun main() {
     // Ordering für den Vergleich von Personen nach Alter
     val intLengthOrd: Ordering<Int> = contraMap(intOrd, transform = { int -> int }) // { it }
     // Frage: wir können wir mit transform int ins Double umwandeln
+    val ord: Ordering<Person> = contraMap(zip(stringOrd, intOrd)) { person ->
+        Pair(person.name, person.age)
+    }*/
 
     val sorting = Sorting()
     val people = listOf(
         Person(" Nathalie ", 25, 172.5),
         Person(" Alex ", 33, 186.0),
         Person("Zah ", 28, 158.3),
-        Person(" Alex ", 18, 183.0),
+        Person(" Alexandra ", 18, 183.0),
         Person(" Jens ", 33, 168.5),
     )
-    val ord: Ordering<Person> = contraMap(zip(stringOrd, intOrd)) { person ->
-        Pair(person.name, person.age)
-    }
-    val personOrd: Ordering<Person> =
-        stringOrd
-            .zip(intOrd.reversed())
-            .zip(doubleOrd)
-            .contraMap { person ->
-                person.name to person.age to person.height //kürzere Schreibweise für Pair(Pair(person.name, person.age), person.height)
-            }
-    println(sorting.sort(people, personOrd))
-}
 
+    val personOrd: Ordering<Person> = stringOrd.zip(intOrd.reversed()).zip(doubleOrd).contraMap { person ->
+        person.name to person.age to person.height // kürzere Schreibweise für Pair(Pair(person.name, person.age), person.height)
+    }
+    println(sorting.sort(people, personOrd))
 
 /*val alice = Person("Alice", 30)
 val bob = Person("Bob", 25)
@@ -128,7 +130,10 @@ println("--------------")
 println(intLengthOrd(alice.age, bob.age)) //  Higher
 println(intLengthOrd(bob.age, charlie.age)) //  Equal
 println(intLengthOrd(charlie.age, alice.age)) //  Lower*/
-
-
 }
+
+
+
+
+
 
